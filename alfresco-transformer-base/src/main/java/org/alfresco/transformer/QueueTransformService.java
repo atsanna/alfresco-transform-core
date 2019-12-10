@@ -64,10 +64,8 @@ public class QueueTransformService
 {
     private static final Logger logger = LoggerFactory.getLogger(QueueTransformService.class);
 
-    // TODO: I know this is not smart but all the the transformation logic is in the Controller.
-    // The controller also manages the probes. There's tons of refactoring needed there, hence this. Sorry.
     @Autowired
-    private TransformController transformController;
+    private TransformRequestHandler transformRequestHandler;
 
     @Autowired
     private TransformMessageConverter transformMessageConverter;
@@ -121,7 +119,7 @@ public class QueueTransformService
             return;
         }
 
-        if (!transformRequest.isPresent())
+        if (transformRequest.isEmpty())
         {
             logger.error("T-Request from message with correlationID {} is null!", correlationId);
             replyWithInternalSvErr(replyToDestinationQueue,
@@ -129,8 +127,8 @@ public class QueueTransformService
             return;
         }
 
-        TransformReply reply = transformController.transform(transformRequest.get(), null)
-                                                  .getBody();
+        final TransformReply reply = transformRequestHandler.transform(transformRequest.get(), null)
+                .getBody();
 
         transformReplySender.send(replyToDestinationQueue, reply);
     }

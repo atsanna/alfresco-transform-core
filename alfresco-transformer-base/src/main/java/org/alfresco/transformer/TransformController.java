@@ -26,19 +26,9 @@
  */
 package org.alfresco.transformer;
 
-import static java.text.MessageFormat.format;
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.alfresco.transform.client.model.TransformReply;
 import org.alfresco.transform.client.model.TransformRequest;
+import org.alfresco.transform.client.model.config.TransformConfig;
 import org.alfresco.transform.exceptions.TransformException;
 import org.alfresco.transformer.logging.LogEntry;
 import org.alfresco.transformer.probes.ProbeTestTransform;
@@ -53,21 +43,28 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+import static java.text.MessageFormat.format;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+
 /**
  * TransformController interface.
  * <br/>
  * It contains much of the common boilerplate code that each of
  * its concrete implementations need as default methods.
  */
-public interface TransformController
-{
+public interface TransformController {
     Logger logger = LoggerFactory.getLogger(TransformController.class);
 
-    ResponseEntity<TransformReply> transform(TransformRequest transformRequest, Long timeout);
+    ResponseEntity<TransformConfig> info();
 
-    void processTransform(final File sourceFile, final File targetFile,
-        final String sourceMimetype, final String targetMimetype,
-        final Map<String, String> transformOptions, final Long timeout);
+    ResponseEntity<TransformReply> transform(TransformRequest transformRequest, Long timeout);
 
     String getTransformerName();
 
@@ -83,24 +80,20 @@ public interface TransformController
     String version();
 
     @GetMapping("/")
-    default String transformForm(Model model)
-    {
+    default String transformForm(Model model) {
         return "transformForm"; // the name of the template
     }
 
     @GetMapping("/error")
-    default String error()
-    {
+    default String error() {
         return "error"; // the name of the template
     }
 
     @GetMapping("/log")
-    default String log(Model model)
-    {
+    default String log(Model model) {
         model.addAttribute("title", getTransformerName() + " Log Entries");
         Collection<LogEntry> log = LogEntry.getLog();
-        if (!log.isEmpty())
-        {
+        if (!log.isEmpty()) {
             model.addAttribute("log", log);
         }
         return "log"; // the name of the template
@@ -108,25 +101,22 @@ public interface TransformController
 
     @GetMapping("/ready")
     @ResponseBody
-    default String ready(HttpServletRequest request)
-    {
+    default String ready(HttpServletRequest request) {
         return probe(request, false);
     }
 
     @GetMapping("/live")
     @ResponseBody
-    default String live(HttpServletRequest request)
-    {
+    default String live(HttpServletRequest request) {
         return probe(request, true);
     }
 
     //region [Exception Handlers]
     @ExceptionHandler(TypeMismatchException.class)
     default void handleParamsTypeMismatch(HttpServletResponse response,
-        MissingServletRequestParameterException e) throws IOException
-    {
+                                          MissingServletRequestParameterException e) throws IOException {
         final String message = format("Request parameter ''{0}'' is of the wrong type", e
-            .getParameterName());
+                .getParameterName());
         final int statusCode = BAD_REQUEST.value();
 
         logger.error(message, e);
@@ -138,8 +128,7 @@ public interface TransformController
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     default void handleMissingParams(HttpServletResponse response,
-        MissingServletRequestParameterException e) throws IOException
-    {
+                                     MissingServletRequestParameterException e) throws IOException {
         final String message = format("Request parameter ''{0}'' is missing", e.getParameterName());
         final int statusCode = BAD_REQUEST.value();
 
@@ -152,8 +141,7 @@ public interface TransformController
 
     @ExceptionHandler(TransformException.class)
     default void transformExceptionWithMessage(HttpServletResponse response,
-        TransformException e) throws IOException
-    {
+                                               TransformException e) throws IOException {
         final String message = e.getMessage();
         final int statusCode = e.getStatusCode();
 
@@ -164,6 +152,22 @@ public interface TransformController
 
         response.sendError(statusCode, getTransformerName() + " - " + message);
     }
-
     //endregion
+
+    static Map<String, String> createTransformOptions(Object... namesAndValues) {
+        if (namesAndValues.length % 2 != 0) {
+            logger.error(
+                    "Incorrect number of parameters. Should have an even number as they are names and values.");
+        }
+
+        final Map<String, String> transformOptions = new HashMap<>();
+        for (int i = 0; i < namesAndValues.length; i += 2) {
+            String name = namesAndValues[i].toString();
+            Object value = namesAndValues[i + 1];
+            if (value != null) {
+                transformOptions.put(name, value.toString());
+            }
+        }
+        return transformOptions;
+    }
 }

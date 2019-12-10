@@ -26,31 +26,24 @@
  */
 package org.alfresco.transformer;
 
-import static org.alfresco.transformer.fs.FileManager.createAttachment;
-import static org.alfresco.transformer.fs.FileManager.createSourceFile;
-import static org.alfresco.transformer.fs.FileManager.createTargetFile;
-import static org.alfresco.transformer.fs.FileManager.createTargetFileName;
-import static org.alfresco.transformer.util.Util.stringToInteger;
-import static org.springframework.http.HttpStatus.OK;
-import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
-
-import java.io.File;
-import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
-
-import org.alfresco.transformer.executors.ImageMagickCommandExecutor;
 import org.alfresco.transformer.logging.LogEntry;
-import org.alfresco.transformer.probes.ProbeTestTransform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletRequest;
+import java.io.File;
+import java.util.Map;
+
+import static org.alfresco.transformer.TransformController.createTransformOptions;
+import static org.alfresco.transformer.fs.FileManager.*;
+import static org.springframework.http.HttpStatus.OK;
+import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 /**
  * Controller for the Docker based ImageMagick transformer.
@@ -79,34 +72,10 @@ public class ImageMagickController extends AbstractTransformerController
 {
     private static final Logger logger = LoggerFactory.getLogger(ImageMagickController.class);
 
-    @Autowired
-    private ImageMagickCommandExecutor commandExecutor;
-
     @Override
     public String getTransformerName()
     {
         return "ImageMagick";
-    }
-
-    @Override
-    public String version()
-    {
-        return commandExecutor.version();
-    }
-
-    @Override
-    public ProbeTestTransform getProbeTestTransform()
-    {
-        // See the Javadoc on this method and Probes.md for the choice of these values.
-        return new ProbeTestTransform(this, "quick.jpg", "quick.png",
-            35593, 1024, 150, 1024, 60 * 15 + 1, 60 * 15)
-        {
-            @Override
-            protected void executeTransformCommand(File sourceFile, File targetFile)
-            {
-                commandExecutor.run("", sourceFile, "", targetFile, null);
-            }
-        };
     }
 
     @PostMapping(value = "/transform", consumes = MULTIPART_FORM_DATA_VALUE)
@@ -148,38 +117,32 @@ public class ImageMagickController extends AbstractTransformerController
         // which supplies the commandOptions.
         @RequestParam(value = "commandOptions", required = false) String commandOptions)
     {
-        String targetFilename = createTargetFileName(sourceMultipartFile.getOriginalFilename(),
-            targetExtension);
+        final String targetFilename = createTargetFileName(sourceMultipartFile.getOriginalFilename(), targetExtension);
         getProbeTestTransform().incrementTransformerCount();
-        File sourceFile = createSourceFile(request, sourceMultipartFile);
-        File targetFile = createTargetFile(request, targetFilename);
+        final File sourceFile = createSourceFile(request, sourceMultipartFile);
+        final File targetFile = createTargetFile(request, targetFilename);
         // Both files are deleted by TransformInterceptor.afterCompletion
 
-        final String options = OptionsBuilder
-            .builder()
-            .withStartPage(startPage)
-            .withEndPage(endPage)
-            .withAlphaRemove(alphaRemove)
-            .withAutoOrient(autoOrient)
-            .withCropGravity(cropGravity)
-            .withCropWidth(cropWidth)
-            .withCropHeight(cropHeight)
-            .withCropPercentage(cropPercentage)
-            .withCropXOffset(cropXOffset)
-            .withCropYOffset(cropYOffset)
-            .withThumbnail(thumbnail)
-            .withResizeWidth(resizeWidth)
-            .withResizeHeight(resizeHeight)
-            .withResizePercentage(resizePercentage)
-            .withAllowEnlargement(allowEnlargement)
-            .withMaintainAspectRatio(maintainAspectRatio)
-            .withCommandOptions(commandOptions)
-            .build();
+        final Map<String, String> transformOptions = createTransformOptions(
+                "startPage", startPage,
+                "endPage", endPage,
+                "alphaRemove", alphaRemove,
+                "autoOrient", autoOrient,
+                "cropGravity", cropGravity,
+                "cropWidth", cropWidth,
+                "cropHeight", cropHeight,
+                "cropPercentage", cropPercentage,
+                "cropXOffset", cropXOffset,
+                "cropYOffset", cropYOffset,
+                "thumbnail", thumbnail,
+                "resizeWidth", resizeWidth,
+                "resizeHeight", resizeHeight,
+                "resizePercentage", resizePercentage,
+                "allowEnlargement", allowEnlargement,
+                "maintainAspectRatio", maintainAspectRatio,
+                "commandOptions", commandOptions);
 
-        String pageRange = calculatePageRange(startPage, endPage);
-
-        commandExecutor.run(options, sourceFile, pageRange, targetFile,
-            timeout);
+        transformHandler.processTransform(sourceFile, targetFile, null, null, transformOptions, timeout);
 
         final ResponseEntity<Resource> body = createAttachment(targetFilename, targetFile);
         LogEntry.setTargetSize(targetFile.length());
@@ -187,52 +150,5 @@ public class ImageMagickController extends AbstractTransformerController
         time += LogEntry.addDelay(testDelay);
         getProbeTestTransform().recordTransformTime(time);
         return body;
-    }
-
-    @Override
-    public void processTransform(final File sourceFile, final File targetFile,
-        final String sourceMimetype, final String targetMimetype,
-        final Map<String, String> transformOptions, final Long timeout)
-    {
-        logger.debug("Processing request with: sourceFile '{}', targetFile '{}', transformOptions" +
-                     " '{}', timeout {} ms", sourceFile, targetFile, transformOptions, timeout);
-
-        final String options = OptionsBuilder
-            .builder()
-            .withStartPage(transformOptions.get("startPage"))
-            .withEndPage(transformOptions.get("endPage"))
-            .withAlphaRemove(transformOptions.get("alphaRemove"))
-            .withAutoOrient(transformOptions.get("autoOrient"))
-            .withCropGravity(transformOptions.get("cropGravity"))
-            .withCropWidth(transformOptions.get("cropWidth"))
-            .withCropHeight(transformOptions.get("cropHeight"))
-            .withCropPercentage(transformOptions.get("cropPercentage"))
-            .withCropXOffset(transformOptions.get("cropXOffset"))
-            .withCropYOffset(transformOptions.get("cropYOffset"))
-            .withThumbnail(transformOptions.get("thumbnail"))
-            .withResizeWidth(transformOptions.get("resizeWidth"))
-            .withResizeHeight(transformOptions.get("resizeHeight"))
-            .withResizePercentage(transformOptions.get("resizePercentage"))
-            .withAllowEnlargement(transformOptions.get("allowEnlargement"))
-            .withMaintainAspectRatio(transformOptions.get("maintainAspectRatio"))
-            .build();
-
-        final String pageRange = calculatePageRange(
-            stringToInteger(transformOptions.get("startPage")),
-            stringToInteger(transformOptions.get("endPage")));
-
-        commandExecutor.run(options, sourceFile, pageRange, targetFile,
-            timeout);
-    }
-
-    private static String calculatePageRange(Integer startPage, Integer endPage)
-    {
-        return startPage == null
-               ? endPage == null
-                 ? ""
-                 : "[" + endPage + ']'
-               : endPage == null || startPage.equals(endPage)
-                 ? "[" + startPage + ']'
-                 : "[" + startPage + '-' + endPage + ']';
     }
 }

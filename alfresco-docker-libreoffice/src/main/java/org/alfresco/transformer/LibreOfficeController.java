@@ -26,30 +26,23 @@
  */
 package org.alfresco.transformer;
 
-import static org.alfresco.transformer.fs.FileManager.createAttachment;
-import static org.alfresco.transformer.fs.FileManager.createSourceFile;
-import static org.alfresco.transformer.fs.FileManager.createTargetFile;
-import static org.alfresco.transformer.fs.FileManager.createTargetFileName;
-import static org.springframework.http.HttpStatus.OK;
-import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
-
-import java.io.File;
-import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
-
-import org.alfresco.transformer.executors.LibreOfficeJavaExecutor;
 import org.alfresco.transformer.logging.LogEntry;
-import org.alfresco.transformer.probes.ProbeTestTransform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletRequest;
+import java.io.File;
+
+import static java.util.Collections.emptyMap;
+import static org.alfresco.transformer.fs.FileManager.*;
+import static org.springframework.http.HttpStatus.OK;
+import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 /**
  * Controller for the Docker based LibreOffice transformer.
@@ -77,34 +70,10 @@ public class LibreOfficeController extends AbstractTransformerController
 {
     private static final Logger logger = LoggerFactory.getLogger(LibreOfficeController.class);
 
-    @Autowired
-    private LibreOfficeJavaExecutor javaExecutor;
-
     @Override
     public String getTransformerName()
     {
         return "LibreOffice";
-    }
-
-    @Override
-    public String version()
-    {
-        return "LibreOffice available";
-    }
-
-    @Override
-    public ProbeTestTransform getProbeTestTransform()
-    {
-        // See the Javadoc on this method and Probes.md for the choice of these values.
-        return new ProbeTestTransform(this, "quick.doc", "quick.pdf",
-            11817, 1024, 150, 10240, 60 * 30 + 1, 60 * 15 + 20)
-        {
-            @Override
-            protected void executeTransformCommand(File sourceFile, File targetFile)
-            {
-                javaExecutor.call(sourceFile, targetFile);
-            }
-        };
     }
 
     //todo: the "timeout" request parameter is ignored; the timeout is preset at JodConverter creation
@@ -115,14 +84,13 @@ public class LibreOfficeController extends AbstractTransformerController
         @RequestParam(value = "timeout", required = false) Long timeout,
         @RequestParam(value = "testDelay", required = false) Long testDelay)
     {
-        String targetFilename = createTargetFileName(sourceMultipartFile.getOriginalFilename(),
-            targetExtension);
+        final String targetFilename = createTargetFileName(sourceMultipartFile.getOriginalFilename(), targetExtension);
         getProbeTestTransform().incrementTransformerCount();
-        File sourceFile = createSourceFile(request, sourceMultipartFile);
-        File targetFile = createTargetFile(request, targetFilename);
+        final File sourceFile = createSourceFile(request, sourceMultipartFile);
+        final File targetFile = createTargetFile(request, targetFilename);
         // Both files are deleted by TransformInterceptor.afterCompletion
 
-        javaExecutor.call(sourceFile, targetFile);
+        transformHandler.processTransform(sourceFile, targetFile, null, null, emptyMap(), timeout);
 
         final ResponseEntity<Resource> body = createAttachment(targetFilename, targetFile);
         LogEntry.setTargetSize(targetFile.length());
@@ -130,16 +98,5 @@ public class LibreOfficeController extends AbstractTransformerController
         time += LogEntry.addDelay(testDelay);
         getProbeTestTransform().recordTransformTime(time);
         return body;
-    }
-
-    @Override
-    public void processTransform(final File sourceFile, final File targetFile,
-        final String sourceMimetype, final String targetMimetype,
-        final Map<String, String> transformOptions, final Long timeout)
-    {
-        logger.debug("Processing request with: sourceFile '{}', targetFile '{}', transformOptions" +
-                     " '{}', timeout {} ms", sourceFile, targetFile, transformOptions, timeout);
-
-        javaExecutor.call(sourceFile, targetFile);
     }
 }
