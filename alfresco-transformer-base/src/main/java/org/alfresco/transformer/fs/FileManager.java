@@ -160,20 +160,18 @@ public class FileManager
         }
     }
 
-    public static String getFilenameFromContentDisposition(HttpHeaders headers)
+    public static String getFilenameFromContentDisposition(final HttpHeaders headers)
     {
-        String filename = "";
-        String contentDisposition = headers.getFirst(CONTENT_DISPOSITION);
-        if (contentDisposition != null)
+        final String contentDisposition = headers.getFirst(CONTENT_DISPOSITION);
+        if (contentDisposition == null)
         {
-            String[] strings = contentDisposition.split("; *");
-            filename = Arrays.stream(strings)
-                             .filter(s -> s.startsWith(FILENAME))
-                             .findFirst()
-                             .map(s -> s.substring(FILENAME.length()))
-                             .orElse("");
+            return "";
         }
-        return filename;
+        return Arrays.stream(contentDisposition.split("; *"))
+                     .filter(s -> s.startsWith(FILENAME))
+                     .findFirst()
+                     .map(s -> s.substring(FILENAME.length()))
+                     .orElse("");
     }
 
     /**

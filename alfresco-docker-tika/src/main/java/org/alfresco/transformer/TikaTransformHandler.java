@@ -38,8 +38,8 @@ import java.io.File;
 import java.util.Map;
 
 import static java.lang.Boolean.parseBoolean;
+import static org.alfresco.transform.client.model.Mimetype.MIMETYPE_TEXT_PLAIN;
 import static org.alfresco.transformer.executors.Tika.*;
-import static org.alfresco.transformer.util.MimetypeMap.MIMETYPE_TEXT_PLAIN;
 
 @Component
 public class TikaTransformHandler implements TransformHandler {

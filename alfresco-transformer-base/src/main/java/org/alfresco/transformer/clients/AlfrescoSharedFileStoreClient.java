@@ -84,14 +84,14 @@ public class AlfrescoSharedFileStoreClient
     {
         try
         {
-            FileSystemResource value = new FileSystemResource(file.getAbsolutePath());
-            LinkedMultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
+            final FileSystemResource value = new FileSystemResource(file.getAbsolutePath());
+            final LinkedMultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
             map.add("file", value);
-            HttpHeaders headers = new HttpHeaders();
+            final HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MULTIPART_FORM_DATA);
-            HttpEntity<LinkedMultiValueMap<String, Object>> requestEntity = new HttpEntity<>(map,
-                headers);
-            ResponseEntity<FileRefResponse> responseEntity = restTemplate
+            final HttpEntity<LinkedMultiValueMap<String, Object>> requestEntity =
+                new HttpEntity<>(map, headers);
+            final ResponseEntity<FileRefResponse> responseEntity = restTemplate
                 .exchange(fileStoreUrl, POST, requestEntity, FileRefResponse.class);
             return responseEntity.getBody();
         }

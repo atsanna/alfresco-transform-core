@@ -51,6 +51,7 @@ import org.junit.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.Spy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jms.support.converter.MessageConversionException;
@@ -58,7 +59,7 @@ import org.springframework.jms.support.converter.MessageConversionException;
 public class QueueTransformServiceTest
 {
     @Mock
-    private TransformController transformController;
+    private TransformRequestHandler transformRequestHandler;
     @Mock
     private TransformMessageConverter transformMessageConverter;
     @Mock
@@ -78,7 +79,7 @@ public class QueueTransformServiceTest
     {
         queueTransformService.receive(null);
 
-        verifyNoMoreInteractions(transformController);
+        verifyNoMoreInteractions(transformRequestHandler);
         verifyNoMoreInteractions(transformMessageConverter);
         verifyNoMoreInteractions(transformReplySender);
     }
@@ -88,7 +89,7 @@ public class QueueTransformServiceTest
     {
         queueTransformService.receive(new ActiveMQObjectMessage());
 
-        verifyNoMoreInteractions(transformController);
+        verifyNoMoreInteractions(transformRequestHandler);
         verifyNoMoreInteractions(transformMessageConverter);
         verifyNoMoreInteractions(transformReplySender);
     }
@@ -116,7 +117,7 @@ public class QueueTransformServiceTest
         verify(transformMessageConverter).fromMessage(msg);
         verify(transformReplySender).send(destination, reply, msg.getCorrelationId());
 
-        verifyNoMoreInteractions(transformController);
+        verifyNoMoreInteractions(transformRequestHandler);
     }
 
     @Test
@@ -143,7 +144,7 @@ public class QueueTransformServiceTest
         verify(transformMessageConverter).fromMessage(msg);
         verify(transformReplySender).send(destination, reply, msg.getCorrelationId());
 
-        verifyNoMoreInteractions(transformController);
+        verifyNoMoreInteractions(transformRequestHandler);
     }
 
     @Test
@@ -170,7 +171,7 @@ public class QueueTransformServiceTest
         verify(transformMessageConverter).fromMessage(msg);
         verify(transformReplySender).send(destination, reply, msg.getCorrelationId());
 
-        verifyNoMoreInteractions(transformController);
+        verifyNoMoreInteractions(transformRequestHandler);
     }
 
     @Test
@@ -188,12 +189,12 @@ public class QueueTransformServiceTest
 
         doReturn(request).when(transformMessageConverter).fromMessage(msg);
         doReturn(new ResponseEntity<>(reply, HttpStatus.valueOf(reply.getStatus())))
-            .when(transformController).transform(request, null);
+            .when(transformRequestHandler).transform(request, null);
 
         queueTransformService.receive(msg);
 
         verify(transformMessageConverter).fromMessage(msg);
-        verify(transformController).transform(request, null);
+        verify(transformRequestHandler).transform(request, null);
         verify(transformReplySender).send(destination, reply);
     }
 
@@ -206,7 +207,7 @@ public class QueueTransformServiceTest
 
         queueTransformService.receive(msg);
 
-        verifyNoMoreInteractions(transformController);
+        verifyNoMoreInteractions(transformRequestHandler);
         verifyNoMoreInteractions(transformMessageConverter);
         verifyNoMoreInteractions(transformReplySender);
     }
@@ -229,12 +230,12 @@ public class QueueTransformServiceTest
 
         doReturn(request).when(transformMessageConverter).fromMessage(msg);
         doReturn(new ResponseEntity<>(reply, HttpStatus.valueOf(reply.getStatus())))
-            .when(transformController).transform(request, null);
+            .when(transformRequestHandler).transform(request, null);
 
         queueTransformService.receive(msg);
 
         verify(transformMessageConverter).fromMessage(msg);
-        verify(transformController).transform(request, null);
+        verify(transformRequestHandler).transform(request, null);
         verify(transformReplySender).send(destination, reply);
     }
 }

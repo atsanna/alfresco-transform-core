@@ -203,8 +203,8 @@ public class TransformRequestHandler {
         final HttpHeaders headers = responseEntity.getHeaders();
         final String filename = getFilenameFromContentDisposition(headers);
 
-        String extension = getFilenameExtension(filename);
-        MediaType contentType = headers.getContentType();
+        final String extension = getFilenameExtension(filename);
+        final MediaType contentType = headers.getContentType();
         long size = headers.getContentLength();
 
         final Resource body = responseEntity.getBody();
